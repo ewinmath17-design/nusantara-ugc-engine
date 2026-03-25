@@ -14,6 +14,8 @@ with st.sidebar:
     st.header("🔑 Pengaturan API")
     api_key = st.text_input("Masukkan Google Gemini API Key:", type="password")
     st.markdown("[Dapatkan API Key di Google AI Studio](https://aistudio.google.com/app/apikey)")
+    st.divider()
+    st.caption("Aplikasi ini otomatis mendeteksi model Gemini terbaik yang tersedia di API Key Anda.")
 
 # --- FORM INPUT MULTIMODAL ---
 st.subheader("📤 Input Aset")
@@ -86,17 +88,41 @@ if st.button("✨ Generate UGC Assets", use_container_width=True, type="primary"
         st.warning("Mohon upload Gambar Produk dan Referensi Wajah/Model.")
     else:
         try:
-            with st.spinner("⏳ Sedang merancang storyboard dan menganalisis produk..."):
+            with st.spinner("⏳ Sedang menganalisis aset dan mencari model AI yang sesuai..."):
                 # Konfigurasi API
                 genai.configure(api_key=api_key)
                 
-                # Gunakan model Flash untuk kecepatan multimodal
-                model = genai.GenerativeModel('gemini-1.5-pro')
+                # --- SISTEM PENDETEKSI MODEL OTOMATIS ---
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                
+                target_model = None
+                prioritas_model = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.5-flash-latest', 'models/gemini-pro-vision']
+                
+                # Cari model prioritas
+                for preferred in prioritas_model:
+                    if preferred in available_models:
+                        target_model = preferred.replace('models/', '')
+                        break
+                
+                # Jika tidak ada di daftar prioritas, ambil model apapun yang tersedia
+                if not target_model and available_models:
+                    target_model = available_models[0].replace('models/', '')
+                
+                # Jika sama sekali tidak ada model yang mendukung
+                if not target_model:
+                    st.error(f"Gagal menemukan model. Daftar model API Anda: {available_models}")
+                    st.stop()
+                
+                st.info(f"*(Berhasil terhubung menggunakan model: **{target_model}**)*")
+                
+                # Inisialisasi Model Terpilih
+                model = genai.GenerativeModel(target_model)
                 
                 # Buka file gambar dengan PIL
                 pil_produk = Image.open(img_produk)
                 pil_model = Image.open(img_model)
                 
+            with st.spinner("⏳ Sedang merancang storyboard..."):
                 # Eksekusi Prompt Multimodal
                 response = model.generate_content([system_prompt, pil_produk, pil_model])
                 
@@ -104,25 +130,26 @@ if st.button("✨ Generate UGC Assets", use_container_width=True, type="primary"
                 response_text = response.text.replace("```json", "").replace("```", "").strip()
                 data = json.loads(response_text)
 
-                # --- MENAMPILKAN HASIL ---
-                st.success("✅ Aset UGC Berhasil Dibuat!")
-                st.divider()
+            # --- MENAMPILKAN HASIL ---
+            st.success("✅ Aset UGC Berhasil Dibuat!")
+            st.divider()
 
-                # 1. Analisis Produk
-                st.subheader("📌 Analisis Produk & Angle")
-                tags_html = "".join([f"<span style='background:#e8f5e9; color:#2e7d32; padding:5px 10px; border-radius:15px; margin-right:5px; font-size:14px;'>{fitur}</span>" for fitur in data['product_analysis']])
-                st.markdown(tags_html, unsafe_allow_html=True)
-                st.write("")
+            # 1. Analisis Produk
+            st.subheader("📌 Analisis Produk & Angle")
+            tags_html = "".join([f"<span style='background:#e8f5e9; color:#2e7d32; padding:5px 10px; border-radius:15px; margin-right:5px; font-size:14px; display:inline-block; margin-bottom:5px;'>{fitur}</span>" for fitur in data['product_analysis']])
+            st.markdown(tags_html, unsafe_allow_html=True)
+            st.write("")
 
-                # 2. Storyboard
-                st.subheader("🎥 Video Storyboard (15s)")
-                st.info(f"**Hook Angle:** {data['video_storyboard']['hook']} \n\n **🎵 Audio/Musik:** {data['video_storyboard']['audio_vibe']}")
+            # 2. Storyboard
+            st.subheader("🎥 Video Storyboard (15s)")
+            st.info(f"**Hook Angle:** {data['video_storyboard']['hook']} \n\n **🎵 Audio/Musik:** {data['video_storyboard']['audio_vibe']}")
 
-                for scene in data['video_storyboard']['scenes']:
-                    with st.expander(f"🎬 Scene {scene['durasi']}", expanded=True):
-                        st.markdown(f"**👁️ Visual:** {scene['visual']}")
-                        st.markdown(f"**🗣️ Voiceover:** *\"{scene['voiceover']}\"*")
-                        st.markdown(f"**📱 Text on Screen:** `{scene['text_on_screen']}`")
+            for scene in data['video_storyboard']['scenes']:
+                with st.expander(f"🎬 Scene {scene['durasi']}", expanded=True):
+                    st.markdown(f"**👁️ Visual:** {scene['visual']}")
+                    st.markdown(f"**🗣️ Voiceover:** *\"{scene['voiceover']}\"*")
+                    st.markdown(f"**📱 Text on Screen:** `{scene['text_on_screen']}`")
 
         except Exception as e:
-            st.error(f"Terjadi kesalahan: {e}")
+            st.error(f"Terjadi kesalahan saat memproses data: {e}")
+            st.caption("Pastikan gambar yang diupload tidak mengandung konten sensitif atau format yang rusak.")
