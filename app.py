@@ -91,7 +91,7 @@ if st.button("✨ Generate UGC Assets", use_container_width=True, type="primary"
                 genai.configure(api_key=api_key)
                 
                 # Gunakan model Flash untuk kecepatan multimodal
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash-lates')
                 
                 # Buka file gambar dengan PIL
                 pil_produk = Image.open(img_produk)
